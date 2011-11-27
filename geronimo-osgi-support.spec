@@ -3,7 +3,7 @@
 
 Name:             geronimo-osgi-support
 Version:          1.0
-Release:          4
+Release:          6
 Summary:          OSGI spec bundle support
 Group:            Development/Java
 License:          ASL 2.0
