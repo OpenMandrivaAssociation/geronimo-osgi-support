@@ -1,38 +1,25 @@
+%{?_javapackages_macros:%_javapackages_macros}
 %global registry geronimo-osgi-registry
 %global locator geronimo-osgi-locator
 
 Name:             geronimo-osgi-support
 Version:          1.0
-Release:          6
+Release:          14.0%{?dist}
 Summary:          OSGI spec bundle support
-Group:            Development/Java
-License:          ASL 2.0
+License:          ASL 2.0 and W3C
 URL:              http://geronimo.apache.org/
 
 Source0:          http://repo2.maven.org/maven2/org/apache/geronimo/specs/%{name}/%{version}/%{name}-%{version}-source-release.tar.gz
-Source1:          %{name}.depmap
-# Use parent pom files instead of unavailable 'genesis-java5-flava'
-Patch1:           use_parent_pom.patch
-# Remove itests due to unavailable dependencies
-Patch2:           remove-itests.patch
-BuildRoot:        %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:        noarch
 
-BuildRequires:    java-devel >= 0:1.6.0
+BuildRequires:    java-devel >= 1:1.6.0
 BuildRequires:    jpackage-utils
-BuildRequires:    maven2 >= 2.2.1
+BuildRequires:    maven-local
 BuildRequires:    felix-osgi-core
 BuildRequires:    felix-osgi-compendium
 BuildRequires:    geronimo-parent-poms
 BuildRequires:    maven-resources-plugin
-BuildRequires:    maven-surefire-provider-junit4
 
-Requires:         java >= 0:1.6.0
-Requires:         jpackage-utils
-Requires:         felix-osgi-core
-Requires:         felix-osgi-compendium
-Requires(post):   jpackage-utils
-Requires(postun): jpackage-utils
 
 Provides:         geronimo-osgi-locator = %{version}-%{release}
 Provides:         geronimo-osgi-registry = %{version}-%{release}
@@ -40,12 +27,10 @@ Provides:         geronimo-osgi-registry = %{version}-%{release}
 %description
 This project is a set of bundles and integration tests for implementing
 OSGi-specific lookup in the Geronimo spec projects.
-    
+
 
 %package javadoc
-Group:            Development/Java
 Summary:          Javadoc for %{name}
-Requires:         jpackage-utils
 
 %description javadoc
 This package contains the API documentation for %{name}.
@@ -53,65 +38,81 @@ This package contains the API documentation for %{name}.
 %prep
 %setup -q
 iconv -f iso8859-1 -t utf-8 LICENSE > LICENSE.conv && mv -f LICENSE.conv LICENSE
-sed -i 's/\r//' LICENSE 
-%patch1 -p0
-%patch2 -p0
+sed -i 's/\r//' LICENSE NOTICE
+# Use parent pom files instead of unavailable 'genesis-java5-flava'
+%pom_set_parent org.apache.geronimo.specs:specs:1.4
+
+# Remove itests due to unavailable dependencies
+%pom_disable_module geronimo-osgi-itesta
+%pom_disable_module geronimo-osgi-itestb
+%pom_disable_module geronimo-osgi-registry-itests
+%pom_disable_module geronimo-osgi-locator-itests
+
+%pom_xpath_inject "pom:plugin[pom:artifactId[text()='maven-bundle-plugin']]
+                       /pom:configuration/pom:instructions" "
+    <Export-Package>!*</Export-Package>" geronimo-osgi-locator
+
+# preserve compatibility locations for jars
+%mvn_file ':{*}' @1
 
 %build
-export MAVEN_REPO_LOCAL=$(pwd)/.m2/repository
-mvn-jpp \
-        -e \
-        -Dmaven2.jpp.mode=true \
-        -Dmaven2.jpp.depmap.file="%{SOURCE1}" \
-        -Dmaven.repo.local=$MAVEN_REPO_LOCAL \
-        install javadoc:aggregate
+%mvn_build
 
 %install
-rm -rf %{buildroot}
+%mvn_install
 
-# jars
-install -d -m 0755 %{buildroot}%{_javadir}
-install -m 644 %{registry}/target/%{registry}-%{version}.jar %{buildroot}%{_javadir}/%{registry}-%{version}.jar
-install -m 644 %{locator}/target/%{locator}-%{version}.jar %{buildroot}%{_javadir}/%{locator}-%{version}.jar
+%files -f .mfiles
+%doc LICENSE NOTICE
 
-(cd %{buildroot}%{_javadir} && for jar in *-%{version}*; \
-    do ln -sf ${jar} `echo $jar| sed "s|-%{version}||g"`; done)
+%files javadoc -f .mfiles-javadoc
+%doc LICENSE NOTICE
 
-%add_to_maven_depmap org.apache.geronimo.specs %{name} %{version} JPP %{name}
-%add_to_maven_depmap org.apache.geronimo.specs %{registry} %{version} JPP %{registry}
-%add_to_maven_depmap org.apache.geronimo.specs %{locator} %{version} JPP %{locator}
+%changelog
+* Thu Aug 08 2013 Stanislav Ochotnicky <sochotnicky@redhat.com> - 1.0-14
+- Update to latest packaging guidelines
 
+* Sat Aug 03 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0-13
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_20_Mass_Rebuild
 
-# poms
-install -d -m 0755 %{buildroot}%{_mavenpomdir}
-install -pm 644 pom.xml %{buildroot}%{_mavenpomdir}/JPP-%{name}.pom
-install -pm 644 %{registry}/pom.xml %{buildroot}%{_mavenpomdir}/JPP-%{registry}.pom
-install -pm 644 %{locator}/pom.xml %{buildroot}%{_mavenpomdir}/JPP-%{locator}.pom
+* Wed Feb 13 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0-12
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
 
-# javadoc
-install -d -m 0755 %{buildroot}%{_javadocdir}/%{name}-%{version}
-cp -pr target/site/api*/* %{buildroot}%{_javadocdir}/%{name}-%{version}/
-ln -s %{name}-%{version} %{buildroot}%{_javadocdir}/%{name}
+* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 1.0-11
+- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
+- Replace maven BuildRequires with maven-local
 
-%post
-%update_maven_depmap
+* Fri Dec 07 2012 Jaromir Capik <jcapik@redhat.com> 1.0-10
+- Depmap removed (not needed anymore)
+- Removing EOL whitespaces in the spec file
 
-%postun
-%update_maven_depmap
+* Thu Aug 23 2012 Mikolaj Izdebski <mizdebsk@redhat.com> - 1.0-9
+- Fix license tag
+- Install NOTICE files
 
-%clean
-rm -rf %{buildroot}
+* Mon Aug  6 2012 Mikolaj Izdebski <mizdebsk@redhat.com> - 1.0-8
+- Add explicit OSGi export, resolves 812827
 
-%files
-%defattr(-,root,root,-)
-%doc LICENSE
-%{_javadir}/*
-%{_mavenpomdir}/*
-%{_mavendepmapfragdir}/*
+* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0-7
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
 
-%files javadoc
-%defattr(-,root,root,-)
-%doc LICENSE
-%{_javadocdir}/%{name}-%{version}
-%{_javadocdir}/%{name}
+* Fri Jan 13 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
 
+* Wed Nov 30 2011 Alexander Kurtakov <akurtako@redhat.com> 1.0-5
+- Build with maven 3 - site-plugin no longer works with maven2.
+- Adapt to current guidelines.
+
+* Tue Feb 08 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0-4
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
+
+* Mon Aug 2 2010 Chris Spike <chris.spike@arcor.de> 1.0-3
+- Removed W3C from 'License:' field (XMLSchema.dtd not existent)
+
+* Thu Jul 29 2010 Chris Spike <chris.spike@arcor.de> 1.0-2
+- Fixed wrong EOL encoding in LICENSE
+- Fixed LICENSE file-not-utf8
+- Added W3C to 'License:' field
+- Added patch explanations
+
+* Mon Jul 26 2010 Chris Spike <chris.spike@arcor.de> 1.0-1
+- Initial version of the package
