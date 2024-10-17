@@ -7,7 +7,7 @@ Version:          1.0
 Release:          14.0%{?dist}
 Summary:          OSGI spec bundle support
 License:          ASL 2.0 and W3C
-URL:              http://geronimo.apache.org/
+URL:              https://geronimo.apache.org/
 
 Source0:          http://repo2.maven.org/maven2/org/apache/geronimo/specs/%{name}/%{version}/%{name}-%{version}-source-release.tar.gz
 BuildArch:        noarch
